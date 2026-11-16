@@ -1,0 +1,160 @@
+/*! Civil Engineering Learning Tools · © 2026 Rasmus Mott Frandsen. All rights reserved. Published build; copying, modifying or redistributing this code is not permitted without written permission. Original: https://rasmusmott.github.io/civil-engineering-learning-tools/ */
+!function(t){"use strict";var e=t.OD,a=e.ui,s=e.sdof,i=e.newmark,n=e.sd,o=String.raw,r={scen:"stop",method:"average",dtR:.1,zetaPct:1},l={stop:{label:"Emergency stop: thrust ramps off in 3 s",text:"The tower starts at its static offset under 2.5 MN of thrust. The thrust falls linearly to zero over 3 s.",p0:25e5,make:function(t){return{p:i.loads.rampOff(25e5,3),u0:25e5/t.k}}},slam:{label:"Wave slam: 1 s pulse",text:"A triangular force pulse of 1.0 MN peak lasting 1 s hits a tower at rest.",p0:1e6,make:function(){return{p:i.loads.pulse(1e6,.5),u0:0}}},step:{label:"Suddenly applied load",text:"A constant 0.5 MN is switched on at t = 0 and stays on.",p0:5e5,make:function(){return{p:i.loads.step(5e5),u0:0}}},sine:{label:"Sine load at resonance",text:"A 0.2 MN sine load at the natural frequency, as in lesson 16.2.",p0:2e5,make:function(t){return{p:i.loads.sine(2e5,t.wn),u0:0}}}},c=o`
+<div class="col">
+  <div class="eyebrow">Structural dynamics · Lesson 16.3</div>
+  <h1>Time stepping with Newmark</h1>
+  <p class="lede">Lessons 16.1 and 16.2 had formulas for the answer. Real loads rarely allow that: a wave slams, a gust passes, a rotor stop takes a few seconds. The practical way through is to march forward in small time steps and solve a small static-looking problem at each one. Every dynamic analysis program works this way, and its results are only as good as the step size you give it.</p>
+  <div class="say">
+    <strong>After this lesson you can explain</strong>
+    <ul>
+      <li>how one Newmark step turns a dynamic problem into \(\hat k\,u = \hat p\);</li>
+      <li>the difference between a stable time step and an accurate one;</li>
+      <li>how to choose a time step, and what goes wrong when it is too large.</li>
+    </ul>
+  </div>
+</div>
+
+<section id="sec-model" class="col">
+  <h2>The model</h2>
+  <p>Same tower, same equation of motion, now with any load \(p(t)\). Time is cut into steps of length \(\Delta t\). At the start of a step we know displacement, velocity and acceleration. Newmark’s method assumes how the acceleration varies during the step, and from that gives the state at the end.</p>
+  <div class="math">\[ m\,\ddot u_{i+1} + c\,\dot u_{i+1} + k\,u_{i+1} = p_{i+1} \]</div>
+  <p>Two versions differ only in that assumption. <strong>Average acceleration</strong> takes the acceleration as constant over the step, equal to the mean of its start and end values. <strong>Linear acceleration</strong> lets it vary as a straight line. A third method, <strong>central difference</strong>, replaces velocity and acceleration by differences of displacements and needs no equation solving at all.</p>
+  <p class="muted small">Left out: nonlinear behaviour, where each step needs iteration, and methods with built-in numerical damping (HHT-α, generalised-α) that large programs often use.</p>
+</section>
+
+<section id="sec-predict" class="col">
+  <h2>Predict first</h2>
+  <div id="n-predict"></div>
+</section>
+
+<section id="sec-lab" class="wide">
+  <h2>Lab: march through time</h2>
+  <div class="card lab">
+    <div class="lab-side">
+      <canvas id="n-tower" aria-label="Animated side view of the tower following the computed solution"></canvas>
+      <div class="muted small" id="n-exag"></div>
+    </div>
+    <div class="lab-main">
+      <canvas id="n-plot" aria-label="Computed displacement history against the reference solution"></canvas>
+      <div class="muted small">Dark line: reference (the same problem with a very fine step). Orange: your time stepping, one dot per step. The tower follows the orange solution. The point-by-point error grows with time, because a small period error adds up cycle after cycle.</div>
+      <div class="row">
+        <button type="button" class="btn" id="n-play">Pause</button>
+        <button type="button" class="btn-ghost" id="n-restart">Start again</button>
+        <span id="n-status" class="pill good" style="margin-left:auto"></span>
+      </div>
+      <div class="row"><span class="muted small">Load case</span><span id="n-scen"></span></div>
+      <p class="small" id="n-scen-text" style="margin:0"></p>
+      <div class="row"><span class="muted small">Method</span>
+        <button type="button" class="btn-ghost small" data-method="average">Average acceleration</button>
+        <button type="button" class="btn-ghost small" data-method="linear">Linear acceleration</button>
+        <button type="button" class="btn-ghost small" data-method="central">Central difference</button>
+      </div>
+      <div class="controls">
+        <div class="ctl"><label for="n-dt"><span>Time step \(\Delta t / T_n\)</span> <output id="no-dt"></output></label><input type="range" id="n-dt" min="1" max="1000" step="1"><div class="scale small muted" aria-hidden="true"><span style="left:0">0.01</span><span style="left:50%">0.1</span><span style="left:100%">1</span></div></div>
+        <div class="ctl"><label for="n-z"><span>Damping ratio \(\zeta\)</span> <output id="no-z"></output></label><input type="range" id="n-z" min="0" max="10" step="0.1"></div>
+      </div>
+      <div class="row">
+        <span class="muted small">Step presets</span>
+        <button type="button" class="btn-ghost small" data-dt="0.02">Fine, T/50</button>
+        <button type="button" class="btn-ghost small" data-dt="0.1">Rule of thumb, T/10</button>
+        <button type="button" class="btn-ghost small" data-dt="0.3">Coarse, 0.3 T</button>
+        <button type="button" class="btn-ghost small" data-dt="0.56">Just past the linear limit, 0.56 T</button>
+        <button type="button" class="btn-ghost small" id="n-reset">Reset all</button>
+      </div>
+      <div class="tiles" id="n-tiles"></div>
+    </div>
+  </div>
+  <div class="col" style="margin-top:14px">
+    <h3>Try this</h3>
+    <ul class="tight">
+      <li>Keep the emergency stop and average acceleration. Step from T/50 to T/10 to 0.3 T. The solution never blows up, but watch the peaks drift later and later: the computed tower rings too slowly.</li>
+      <li>Switch to central difference at 0.3 T, then nudge the step up past 0.32 T.</li>
+      <li>Choose linear acceleration and the 0.56 T preset. Then go back to average acceleration at the same step.</li>
+      <li>Pick the wave slam at T/10. The step is fine for the tower but samples the 1 s pulse only once or twice. Reduce the step until the first peak matches.</li>
+      <li>Pick the suddenly applied load with zero damping. The peak is twice the static deflection, the factor mentioned in lesson 16.2.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="sec-numbers" class="col">
+  <h2>The numbers, step by step</h2>
+  <p>The very first time step of the current lab settings, worked through. Every later step repeats the same arithmetic with new start values.</p>
+  <div class="row" style="margin-bottom:10px"><button type="button" class="btn-ghost small" id="n-why" aria-pressed="false">Hide explanations</button></div>
+  <div class="steps" id="n-steps"></div>
+</section>
+
+<section id="sec-deriv" class="col">
+  <h2>Where the formulas come from</h2>
+  <details class="deriv">
+    <summary>Show derivation</summary>
+    <p>Newmark’s two equations express the end-of-step velocity and displacement through the accelerations at both ends, with two weights \(\gamma\) and \(\beta\):</p>
+    <div class="math">\[ \dot u_{i+1} = \dot u_i + \Delta t\big[(1-\gamma)\,\ddot u_i + \gamma\,\ddot u_{i+1}\big] \]</div>
+    <div class="math">\[ u_{i+1} = u_i + \Delta t\,\dot u_i + \Delta t^2\big[(\tfrac12-\beta)\,\ddot u_i + \beta\,\ddot u_{i+1}\big] \]</div>
+    <p>With \(\gamma=\tfrac12,\ \beta=\tfrac14\) these are exactly what you get by integrating a constant acceleration \(\tfrac12(\ddot u_i+\ddot u_{i+1})\) twice. With \(\beta=\tfrac16\) you get the result for an acceleration that varies linearly.</p>
+    <p>Solve the second equation for \(\ddot u_{i+1}\), put that into the first to get \(\dot u_{i+1}\), and substitute both into the equation of motion at the end of the step. Everything known moves to the right-hand side, and what is left is one linear equation for \(u_{i+1}\):</p>
+    <div class="math">\[ \underbrace{\Big(k + \frac{\gamma}{\beta\Delta t}c + \frac{1}{\beta\Delta t^2}m\Big)}_{\hat k}\,u_{i+1} = \hat p_{i+1} \]</div>
+    <p>Stability: apply the method to free undamped vibration and ask whether the computed amplitude can grow. With \(\gamma=\tfrac12\) it stays bounded as long as</p>
+    <div class="math">\[ \frac{\Delta t}{T_n} \le \frac{1}{2\pi\sqrt{\tfrac14-\beta}} \]</div>
+    <p>For \(\beta=\tfrac14\) the limit is infinite, for \(\beta=\tfrac16\) it is 0.551, and for \(\beta=0\), which is the central difference method written differently, it is \(1/\pi = 0.318\).</p>
+    <p>Accuracy: for the same free vibration the computed motion is a perfect sine of constant amplitude, but with a slightly wrong period. That period error is what the lab shows as drifting peaks. It shrinks with \(\Delta t^2\).</p>
+    <p class="src muted">Standard results. The method is from Newmark (1959); the derivation, stability limits and accuracy are treated in the works listed under <a href="#" data-goto="sec-refs">References</a> (Chopra, Part I, chapter “Numerical Evaluation of Dynamic Response”).</p>
+  </details>
+</section>
+
+<section id="sec-ex" class="col">
+  <h2>Exercise: one step by hand</h2>
+  <div class="card">
+    <p>Take one average-acceleration step for a tower in free vibration. The numbers are chosen so that \(\omega_n = 1\) rad/s.</p>
+    <table class="data">
+      <tr><td>Mass</td><td class="num">1 000 t</td></tr>
+      <tr><td>Stiffness</td><td class="num">1.00 MN/m</td></tr>
+      <tr><td>Damping, load</td><td class="num">none</td></tr>
+      <tr><td>Start displacement, start velocity</td><td class="num">0.50 m, 0</td></tr>
+      <tr><td>Time step</td><td class="num">0.50 s</td></tr>
+    </table>
+    <p style="margin-top:12px">Answers within 1 % count.</p>
+    <div id="n-ex"></div>
+  </div>
+</section>
+
+<section id="sec-quick" class="col">
+  <h2>Quick-fire</h2>
+  <p>Answer before you calculate.</p>
+  <div class="card" id="n-q1" style="margin-bottom:10px"></div>
+  <div class="card" id="n-q2" style="margin-bottom:10px"></div>
+  <div class="card" id="n-q3"></div>
+</section>
+
+<section id="sec-mistakes" class="col">
+  <h2>Common mistakes</h2>
+  <ul class="tight">
+    <li><strong>Treating stable as accurate.</strong> Average acceleration never blows up, so it will happily return a smooth, plausible and wrong answer. At \(\Delta t = 0.3\,T_n\) its period is about 25 % too long.</li>
+    <li><strong>Choosing the step from the structure only.</strong> The step must also resolve the load. A 1 s pulse needs about ten steps within that second, whatever the tower period is.</li>
+    <li><strong>Forgetting the highest mode.</strong> With a conditionally stable method the limit is set by the shortest period in the whole model, not the one you care about. One stiff element can force a tiny step.</li>
+    <li><strong>Skipping the start acceleration.</strong> \(\ddot u_0\) must come from the equation of motion at \(t = 0\). Setting it to zero puts an error into the very first step.</li>
+    <li><strong>Trusting one run.</strong> Halve the step and run again. If the answer moves, the first run was not converged.</li>
+  </ul>
+</section>
+
+<section id="sec-verify" class="col">
+  <h2>Verification</h2>
+  <p>The calculation core is tested separately from this page. The checks below run in your browser right now on the same code that drives the lab.</p>
+  <div class="card"><span id="n-verify" class="pill good"></span>
+    <details style="margin-top:8px"><summary class="small">Show every check</summary><div class="checks" id="n-checks"></div></details>
+    <p class="muted small" style="margin:10px 0 0">Independent cross-check, done when this version was built (15 Nov 2026): the pulse and ramp-off load cases, stepped with all three methods at \(\Delta t = T_n/2000\), agree with SciPy’s adaptive integrator (DOP853) to within 1.6 × 10⁻⁵ of the peak response. That remaining difference is the step-size error of the methods themselves. Not done: comparison with a commercial structural program.</p>
+  </div>
+</section>
+
+§REFS§
+
+<section id="sec-limits" class="col">
+  <h2>Limits of this model</h2>
+  <ul class="tight">
+    <li>Linear system with one degree of freedom. In a nonlinear analysis each step also needs equilibrium iterations.</li>
+    <li>The stability limits and period errors quoted are for undamped free vibration. Damping changes them slightly.</li>
+    <li>The reference curve is itself a numerical solution with a step of \(T_n/400\) or finer, not an exact one.</li>
+    <li>Loads and structural values are illustrative.</li>
+  </ul>
+  <p class="muted small" style="margin-top:12px">This is a learning tool. It is not verified for design and does not replace a standard, a validated code or an engineer’s judgement.</p>
+</section>
+`;e.lessons.newmark={title:"Time stepping with Newmark",mount:function(d){d.innerHTML=c.replace("§REFS§",n.refsSection(["chopra","newmark","opensees"]));var h,u,m,p,f,g,b,v,y,w,k,T=function(t){return document.getElementById(t)},x={scen:r.scen,method:r.method,dtR:r.dtR,zetaPct:r.zetaPct,t:0,playing:!t.matchMedia("(prefers-reduced-motion: reduce)").matches},_=a.colors(),S=null,M=null,q=a.tex,D=null;function N(){if(document.body.contains(D)){var t=1.25*v,e=a.plot(D,250,{x0:0,x1:b,y0:-t,y1:t,xLabel:"time t [s]",yLabel:"u [m]",col:_}),s=e.ctx;s.save(),s.beginPath(),s.rect(e.L,e.T,e.pw,e.ph),s.clip(),a.line(s,e.X,e.Y,p.t,p.u,_.ink,1.6);var i,o,r,l,c=m.u.map(function(e){return Math.max(-3*t,Math.min(3*t,e))});a.line(s,e.X,e.Y,m.t,c,_.accent,1.6),m.t.length<=260&&(s.fillStyle=_.accent,m.t.forEach(function(t,a){s.beginPath(),s.arc(e.X(t),e.Y(c[a]),2.6,0,6.3),s.fill()})),a.line(s,e.X,e.Y,[x.t,x.t],[-t,t],_.muted,1,[3,3]),s.restore(),n.drawTower(T("n-tower"),{u:Math.max(-1.6*v,Math.min(1.6*v,(i=x.t,o=Math.min(i/g,m.u.length-1),r=Math.min(Math.floor(o),m.u.length-2),l=o-r,m.u[r]+l*(m.u[r+1]-m.u[r])))),pxPerM:46/v,L:n.DEF.L,t:x.t,col:_,exagEl:T("n-exag")})}}function A(t,e,a){return'<div class="tile"><div class="k">'+t+'</div><div class="v">'+e+'</div><div class="u">'+a+"</div></div>"}T("n-scen").innerHTML=Object.keys(l).map(function(t){return'<button type="button" class="btn-ghost small" data-scen="'+t+'">'+l[t].label+"</button>"}).join(" "),a.mc(T("n-predict"),{id:"l163-predict",q:"<p>You integrate the free vibration of an undamped tower with the average acceleration method and a deliberately large step, a third of the natural period. What does the computed motion look like?</p>",options:[{t:"It blows up",why:"Average acceleration is stable for any step size. Central difference would blow up here."},{t:"It slowly dies away",why:"This method adds no artificial damping. The amplitude stays exactly constant."},{t:"Right amplitude, but it rings too slowly",correct:!0,why:"The amplitude is preserved but the period is stretched, here by about 30 %. Stable is not the same as accurate."},{t:"It is exact, because the method is unconditionally stable",why:"Stability only says the error cannot grow without limit. It says nothing about its size."}]});var E=function(){return i.METHODS[x.method].implicit},L=function(){return m.first},z=function(){return"average"===x.method?o`\tfrac14`:o`\tfrac16`},R="Central difference uses a different, explicit update: the next displacement follows directly from the two previous ones, with no effective stiffness to solve. Choose one of the two Newmark methods to see this step.",P=a.stepCards(T("n-steps"),[{id:"ns-a0",title:"Start acceleration",tex:function(){var t=l[x.scen].make(h);return o`\ddot u_0 = \frac{p_0 - c\,\dot u_0 - k\,u_0}{m} = \frac{`+q(t.p(0))+" - "+q(h.c)+o`\cdot 0 - `+q(h.k)+o`\cdot `+q(t.u0)+"}{"+q(h.m)+"} = "+q(L().a0)+o`\ \text{m/s}^2`},why:o`<p><strong>Why.</strong> Displacement and velocity at \(t=0\) are given. The acceleration is not free to choose: the equation of motion fixes it. In the emergency-stop case the thrust and the spring force cancel at the start, so the tower is in static equilibrium and \(\ddot u_0 = 0\).</p><p class="src"><strong>Source.</strong> The equation of motion at \(t = 0\).</p>`},{id:"ns-kh",title:"Effective stiffness",show:E,hiddenMsg:R,tex:function(){return o`\hat k = k + \frac{\gamma}{\beta\,\Delta t}\,c + \frac{1}{\beta\,\Delta t^2}\,m = `+q(h.k)+o` + \frac{1/2}{`+z()+o`\cdot `+q(g)+"}"+q(h.c)+o` + \frac{1}{`+z()+o`\cdot `+q(g)+"^2}"+q(h.m)+" = "+q(L().khat)+o`\ \text{N/m}`},why:function(){return o`<p><strong>Why.</strong> Moving the mass a distance \(u\) within one step takes spring force, plus the force to accelerate the mass to get there in time, plus damping force. All three are proportional to \(u\), so they add up to one stiffness. Here \(\hat k\) is `+a.num(L().khat/h.k,3)+o` times \(k\): at this step size the mass term `+(L().khat/h.k>2?"dominates":"and the spring are of similar size")+o`.</p><p><strong>Numerically.</strong> \(\gamma = \tfrac12\), \(\beta = `+z()+o`\). kg/s² = N/m, so all three terms have the same unit. \(\hat k\) stays the same for every step, so a program factorises it once.</p><p class="src"><strong>Source.</strong> Newmark’s equations put into the equation of motion. See the derivation below.</p>`}},{id:"ns-ph",title:"Effective load",show:E,hiddenMsg:R,tex:function(){var t=L(),e=l[x.scen].make(h);return o`\begin{gathered}\hat p_1 = p_1 + a_1 u_0 + a_2 \dot u_0 + a_3 \ddot u_0 \\[6pt] a_1 = \frac{m}{\beta\Delta t^2}+\frac{\gamma c}{\beta\Delta t} = `+q(t.cm)+o` \\[6pt] a_2 = \frac{m}{\beta\Delta t}+\big(\tfrac{\gamma}{\beta}-1\big)c = `+q(t.cv)+o` \\[6pt] a_3 = \big(\tfrac{1}{2\beta}-1\big)m+\Delta t\big(\tfrac{\gamma}{2\beta}-1\big)c = `+q(t.ca)+o` \\[6pt] \hat p_1 = `+q(t.p1)+" + "+q(t.cm)+o`\cdot `+q(e.u0)+" + "+q(t.cv)+o`\cdot 0 \\[6pt] {} + `+q(t.ca)+o`\cdot `+q(t.a0)+" = "+q(t.phat)+o`\ \text{N}\end{gathered}`},why:o`<p><strong>Why.</strong> The real load at the end of the step, plus terms that carry the memory of where the tower was and how it was moving. They act like extra forces that keep the mass on its current course.</p><p><strong>Numerically.</strong> \(a_1\) in N/m, \(a_2\) in N·s/m and \(a_3\) in kg are constants for a fixed step size; only \(p\), \(u\), \(\dot u\) and \(\ddot u\) change from step to step.</p><p class="src"><strong>Source.</strong> See the derivation below.</p>`},{id:"ns-u1",title:"Solve for the new displacement",show:E,hiddenMsg:R,tex:function(){return o`u_1 = \frac{\hat p_1}{\hat k} = \frac{`+q(L().phat)+"}{"+q(L().khat)+"} = "+q(L().u1,5)+o`\ \text{m}`},why:function(){return o`<p><strong>Why.</strong> The dynamic step has become a static problem: force over stiffness. In a model with many degrees of freedom this is a matrix solve, the same kind as in a static analysis.</p><p><strong>Check.</strong> The reference solution at the same instant is `+a.num(p.u[f],5)+o` m.</p>`}},{id:"ns-va",title:"Update velocity and acceleration",show:E,hiddenMsg:R,tex:function(){var t=L();return o`\begin{gathered}\dot u_1 = \frac{\gamma}{\beta\Delta t}(u_1-u_0) + \big(1-\tfrac{\gamma}{\beta}\big)\dot u_0 + \Delta t\big(1-\tfrac{\gamma}{2\beta}\big)\ddot u_0 = `+q(t.v1)+o`\ \text{m/s} \\[6pt] \ddot u_1 = \frac{u_1-u_0}{\beta\Delta t^2} - \frac{\dot u_0}{\beta\Delta t} - \big(\tfrac{1}{2\beta}-1\big)\ddot u_0 = `+q(t.a1)+o`\ \text{m/s}^2\end{gathered}`},why:o`<p><strong>Why.</strong> Newmark’s two equations, rearranged. With these the state at the end of the step is complete and becomes the start of the next one.</p><p class="src"><strong>Source.</strong> See the derivation below.</p>`},{id:"ns-chk",title:"Is the step small enough?",tex:function(){var t=i.periodRatio(x.method,x.dtR);return o`\frac{\Delta t}{T_n} = \frac{`+q(g)+"}{"+q(h.Tn)+"} = "+q(x.dtR,3)+o` \qquad \text{limit: } `+(isFinite(k)?q(k,3):o`\text{none}`)+o` \qquad \frac{\bar T}{T_n} = `+(isNaN(t)?o`\text{unstable}`:q(t,4))},why:function(){var t=i.periodRatio(x.method,x.dtR);return o`<p><strong>Stability.</strong> `+i.METHODS[x.method].name+(isFinite(k)?o` is stable only for \(\Delta t/T_n \le `+a.num(k,3)+o`\). `+(x.dtR>k?"The current step is above that, so the solution grows without limit.":"The current step is below that."):" is stable for any step size.")+o`</p><p><strong>Accuracy.</strong> `+(isNaN(t)?"":o`The computed free vibration has a period \(\bar T\) that is `+a.num(100*Math.abs(t-1),2)+" % "+(t>=1?"too long":"too short")+o`. After ten cycles the computed peaks are `+a.num(10*Math.abs(t-1),2)+o` of a period out of place. `)+o`A common starting point is \(\Delta t \le T_n/10\) for the shortest period that matters, then halve and compare.</p><p class="src"><strong>Source.</strong> Stability and period error of the Newmark family for undamped free vibration. See the derivation below.</p>`}}]);function W(t){!function(){h=s.properties({m:1e3*n.DEF.m_t,k:1e6*n.DEF.k_MN,zeta:x.zetaPct/100}),u={m:h.m,k:h.k,c:h.c};var t=l[x.scen].make(h);g=x.dtR*h.Tn,b=8*h.Tn;var e=Math.max(2,Math.ceil(b/g));f=Math.max(1,Math.ceil(g/(h.Tn/400))),m=i.integrate(u,t.p,t.u0,0,g,e,x.method),p=i.integrate(u,t.p,t.u0,0,g/f,e*f,"average"),v=0,p.u.forEach(function(t){v=Math.max(v,Math.abs(t))}),y=0;for(var a=0,o=0;o<=e;o++)y=Math.max(y,Math.abs(m.u[o]-p.u[o*f])/v),a=Math.max(a,Math.abs(m.u[o]));k=i.stabilityLimit(x.method),w=x.dtR>k||!(a<20*v),m.peak=a}(),t&&(x.t=0),function(){T("no-dt").textContent=a.num(x.dtR,2)+" ("+a.num(g,3)+" s)",T("no-z").textContent=x.zetaPct.toFixed(1)+" %",T("n-dt").value=a.logPos(x.dtR,.01,1),T("n-z").value=x.zetaPct,T("n-scen-text").textContent=l[x.scen].text,d.querySelectorAll("[data-scen]").forEach(function(t){t.setAttribute("aria-pressed",t.getAttribute("data-scen")===x.scen?"true":"false")}),d.querySelectorAll("[data-method]").forEach(function(t){t.setAttribute("aria-pressed",t.getAttribute("data-method")===x.method?"true":"false")});var t=i.periodRatio(x.method,x.dtR);T("n-tiles").innerHTML=A("Steps per natural period",a.num(1/x.dtR,3),"T<sub>n</sub> = "+a.num(h.Tn,3)+" s")+A("Stability limit Δt / T<sub>n</sub>",isFinite(k)?a.num(k,3):"none",isFinite(k)?"conditionally stable":"stable for any step")+A("Peak, your steps",w?"diverges":a.num(m.peak,3),w?"":"m")+A("Peak, reference",a.num(v,3),"m")+A("Largest point-by-point error",w?"–":a.num(100*y,2),w?"":"% of reference peak")+A("Period error, predicted",isNaN(t)?"–":(t>=1?"+":"−")+a.num(100*Math.abs(t-1),2),isNaN(t)?"":"%");var e=T("n-status");w?(e.className="pill bad",e.textContent="Unstable: the step is above the limit"):Math.abs(m.peak-v)/v>.05||Math.abs(t-1)>.1?(e.className="pill warn",e.textContent="Stable but inaccurate"):(e.className="pill good",e.textContent="Stable, peak within 5 % of the reference")}(),N(),clearTimeout(S),S=setTimeout(P,140)}function C(){document.body.contains(D)&&(_=a.colors(),N())}D=T("n-plot"),T("n-dt").addEventListener("input",function(t){x.dtR=Math.max(.01,a.logVal(parseFloat(t.target.value),.01,1)),W(!0)}),T("n-z").addEventListener("input",function(t){x.zetaPct=parseFloat(t.target.value),W(!0)}),d.querySelectorAll("[data-scen]").forEach(function(t){t.addEventListener("click",function(){x.scen=t.getAttribute("data-scen"),W(!0)})}),d.querySelectorAll("[data-method]").forEach(function(t){t.addEventListener("click",function(){x.method=t.getAttribute("data-method"),W(!0)})}),d.querySelectorAll("[data-dt]").forEach(function(t){t.addEventListener("click",function(){x.dtR=parseFloat(t.getAttribute("data-dt")),W(!0)})}),T("n-play").textContent=x.playing?"Pause":"Play",T("n-play").addEventListener("click",function(){x.playing=!x.playing,T("n-play").textContent=x.playing?"Pause":"Play"}),T("n-restart").addEventListener("click",function(){x.t=0,N()}),T("n-reset").addEventListener("click",function(){Object.keys(r).forEach(function(t){x[t]=r[t]}),W(!0)}),T("n-why").addEventListener("click",function(){var t=T("n-steps").classList.toggle("hide-why");T("n-why").setAttribute("aria-pressed",t?"true":"false"),T("n-why").textContent=t?"Show explanations":"Hide explanations"}),t.addEventListener("resize",C),t.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",C),new MutationObserver(C).observe(document.documentElement,{attributes:!0,attributeFilter:["data-theme"]});var F,I,H=(F=i.integrate({m:1e6,k:1e6,c:0},i.loads.none(),.5,0,.5,1,"average"),I=2*Math.PI,{a0:F.first.a0,khat:F.first.khat,phat:F.first.phat,u1:F.u[1],exact:.5*Math.cos(.5),ratio:.5/I,dtLin:i.stabilityLimit("linear")*I,dtCen:i.stabilityLimit("central")*I}),O=a.near,Y=a.num;a.exercise(T("n-ex"),{id:"l163-ex1",givens:[{sym:"m",label:"m",value:1e6,unit:"kg",name:"Mass, 1 000 t"},{sym:"k",label:"k",value:1e6,unit:"N/m",name:"Stiffness, 1.00 MN/m"},{sym:"u0",label:"u<sub>0</sub>",value:.5,unit:"m",name:"Start displacement"},{sym:"dt",label:"Δt",value:.5,unit:"s",name:"Time step"}],steps:[{id:"a0",sym:"a0",label:"ü<sub>0</sub>",prompt:o`What is the start acceleration \(\ddot u_0\)?`,unit:"m/s²",answer:H.a0,tol:.01,hints:["Use the equation of motion at t = 0. There is no load and no damping.",o`\(m\,\ddot u_0 + k\,u_0 = 0\), so \(\ddot u_0 = -k\,u_0/m\). With the chips: <code>-k*u0/m</code>.`],ref:{id:"ns-a0",label:"Step 1: start acceleration"},diagnose:function(t){return O(t,-H.a0,.01)?"check the sign. The spring pulls the mass back toward zero, so the acceleration is negative.":O(t,1e3*H.a0,.01)?"the mass went in as 1 000. In SI it is 1 000 000 kg.":null},solution:o`\(\ddot u_0 = -(1.0\times10^6\cdot 0.50)/(1.0\times10^6) = `+Y(H.a0)+o`\) m/s².`},{id:"kh",sym:"kh",label:"k̂",type:"pick",prompt:o`What is the effective stiffness \(\hat k\) for average acceleration without damping?`,unit:"N/m",answer:H.khat,options:[{tex:o`\hat k = k + \dfrac{4m}{\Delta t}`,why:o`The mass term is \(m/(\beta\Delta t^2)\): the time step is squared. Check the units, kg/s is not a stiffness.`},{tex:o`\hat k = k + \dfrac{4m}{\Delta t^2}`,correct:!0},{tex:o`\hat k = k + \dfrac{6m}{\Delta t^2}`,why:o`That is linear acceleration, \(\beta = \tfrac16\). Average acceleration has \(\beta = \tfrac14\).`}],ref:{id:"ns-kh",label:"Step 2: effective stiffness"},solution:o`\(\hat k = 1.0\times10^6 + 4\cdot 1.0\times10^6/0.5^2\).`,after:"Seventeen times the real stiffness: within half a second it is mostly the mass that resists."},{id:"ph",sym:"ph",label:"p̂",prompt:o`What is the effective load \(\hat p_1\)? Here \(\hat p_1 = m\,(4u_0/\Delta t^2 + \ddot u_0)\), because the load and the start velocity are zero.`,unit:"N",answer:H.phat,tol:.01,hints:["Two terms inside the bracket. Mind the sign of the acceleration.",o`With the chips: <code>m*(4*u0/dt^2 + a0)</code>.`],ref:{id:"ns-ph",label:"Step 3: effective load"},diagnose:function(t){return O(t,8e6,.01)?"the start acceleration term is missing.":O(t,85e5,.01)?"the start acceleration is negative, so it reduces the effective load.":O(t,7.5,.01)?"that is in MN. The SI answer is in N.":null},solution:o`\(\hat p_1 = 1.0\times10^6\,(8 - 0.5) = `+q(H.phat)+o`\) N.`},{id:"u1",sym:"u1",label:"u<sub>1</sub>",prompt:o`What is the displacement after the step, \(u_1\)?`,unit:"m",answer:H.u1,tol:.003,hints:["A static problem now.",o`\(u_1 = \hat p_1/\hat k\). With the chips: <code>ph/kh</code>.`],ref:{id:"ns-u1",label:"Step 4: solve for the new displacement"},diagnose:function(t){return O(t,H.exact,.0015)?"that is the exact answer, 0.5·cos(0.5). The question asks what the Newmark step gives.":O(t,1/H.u1,.01)?"that is k̂/p̂. Turn the fraction over.":null},solution:o`\(u_1 = 7.5\times10^6/1.7\times10^7 = `+Y(H.u1,5)+o`\) m.`,after:"The exact value is 0.5·cos(0.5) = "+Y(H.exact,5)+" m. One step, 0.5 % off."},{id:"r",sym:"ratio",label:"Δt/T<sub>n</sub>",prompt:o`What fraction of the natural period is this time step, \(\Delta t/T_n\)?`,unit:"–",answer:H.ratio,tol:.01,hints:[o`\(\omega_n = \sqrt{k/m} = 1\) rad/s here.`,o`\(T_n = 2\pi/\omega_n\). With the chips: <code>dt/(2*pi/sqrt(k/m))</code>.`],ref:{id:"ns-chk",label:"Step 6: is the step small enough?"},diagnose:function(t){return O(t,1/H.ratio,.01)?"that is the number of steps per period. The question asks for Δt/Tₙ.":O(t,.5,.01)?"that is Δt·ωₙ. Divide by 2π as well.":null},solution:o`\(T_n = 2\pi\) s, so \(\Delta t/T_n = 0.5/6.283 = `+Y(H.ratio,3)+o`\). About 12.6 steps per period.`},{id:"lim",sym:"dtmax",label:"Δt<sub>max</sub>",type:"pick",prompt:"Suppose you switched to linear acceleration. What is the largest time step that is still stable for this tower?",unit:"s",answer:H.dtLin,options:[{tex:o`\Delta t_{max} = \dfrac{T_n}{\pi}`,why:"That is the central difference limit, 0.318 Tₙ."},{tex:o`\Delta t_{max} = 0.551\,T_n`,correct:!0},{tex:o`\text{no limit}`,why:"Only average acceleration is stable for any step."}],ref:{id:"ns-chk",label:"Step 6: is the step small enough?"},solution:o`\(\Delta t_{max} = 0.551\cdot 6.283\) s.`,after:"Far larger than you would ever use for accuracy on this tower. The limit bites in models with many modes, where the shortest period may be milliseconds."}]}),a.mc(T("n-q1"),{id:"l163-q1",q:"<p><strong>1.</strong> A method is called unconditionally stable. What does that promise?</p>",options:[{t:"The answer is accurate for any time step",why:"No. It can be badly wrong and still stable."},{t:"Errors cannot grow without limit, whatever the time step",correct:!0,why:"Stability is about boundedness only. Accuracy still needs a small enough step."},{t:"No time step is needed",why:"Every step-by-step method needs a step."}]}),a.mc(T("n-q2"),{id:"l163-q2",q:"<p><strong>2.</strong> A finite element model has modes with periods from 6 s down to 0.01 s. You use central difference. What sets the largest usable time step?</p>",options:[{t:"The 6 s mode, since it dominates the response",why:"That would do for accuracy, but the method goes unstable long before."},{t:"The 0.01 s mode",correct:!0,why:o`The limit is \(T/\pi\) of the shortest period in the model: about 0.003 s, even if that mode is of no interest. This is why explicit methods need very many steps, and why implicit ones are the usual choice for slow structural response.`},{t:"The duration of the load",why:"It matters for accuracy, but stability is set by the model."}]}),a.mc(T("n-q3"),{id:"l163-q3",q:"<p><strong>3.</strong> You halve the time step and the peak response changes by 8 %. What do you do?</p>",options:[{t:"Report the first result, since the method is stable",why:"An 8 % change shows the first result had not converged."},{t:"Report the average of the two",why:"Averaging two unconverged answers does not make a converged one."},{t:"Halve again until the change is small",correct:!0,why:"The error of these methods falls by a factor of four each time the step halves. Keep refining until the result stops moving by an amount that matters."}]});var j=e.selfcheck.newmark(),X=j.filter(function(t){return t.pass}).length,B=T("n-verify");B.className="pill "+(X===j.length?"good":"bad"),B.textContent=X+" of "+j.length+" checks pass",T("n-checks").innerHTML=j.map(function(t){return'<div class="c"><span class="'+(t.pass?'ok">PASS':'no">FAIL')+'</span><span class="rung">'+t.rung+"</span><span>"+t.name+(t.detail?' <span class="muted">('+t.detail+")</span>":"")+"</span></div>"}).join(""),W(!0),a.typeset(d),t.requestAnimationFrame(function e(a){document.body.contains(D)&&(null!==M&&x.playing&&(x.t+=3*Math.min(.1,(a-M)/1e3),x.t>b&&(x.t=0),N()),M=a,t.requestAnimationFrame(e))})},progressPrefix:"l163-",progressTotal:10}}("undefined"!=typeof globalThis?globalThis:this);
