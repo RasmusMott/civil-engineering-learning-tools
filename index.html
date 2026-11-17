@@ -19,10 +19,12 @@
   <p class="lede">Interactive lessons for the core subjects of a civil and structural engineering degree. Each one has a live model to play with, every formula worked through with your own numbers, and exercises that check each step.</p>
   <p class="muted small">Pick a topic and press Open. Nothing to install. Topics marked planned are on the way.</p>
   <div id="topics"></div>
+  <section class="group" id="progress-group"><h2>Your progress</h2><p class="muted small">Two figures per topic. Answered counts the questions you got right. Points say how well, at most 3 per question. Both stay in this browser. Resetting is the only way to earn points again.</p><div class="progress" id="progress"></div></section>
   <p class="muted small" style="margin-top:36px">These are learning tools. They are not verified for design and do not replace a standard, a validated code or an engineer’s judgement.</p>
   <p class="muted small" id="copyright"></p>
 </main>
 <script src="kit/curriculum.js"></script>
+<script src="kit/ui.js"></script>
 <script>
   (function () {
     var h = '', ready = [];
@@ -42,6 +44,24 @@
       h += '</ul></section>';
     });
     document.getElementById('topics').innerHTML = h;
+    /* progress sums (STYLE-V2 C3): per topic from the registrations the topic pages leave in ui.store, and sitewide; one reset for the whole site (C4) */
+    var ui = OD.ui, titles = {};
+    OD.curriculum.forEach(function (g) { g.topics.forEach(function (t) { titles[t.slug] = t.n + '. ' + t.t; }); });
+    function progress() {
+      var per = {}, all = { answered: 0, total: 0, points: 0, max: 0 }, el = document.getElementById('progress');
+      ui.store.registered('').forEach(function (p) {
+        var r = ui.store.regOf(p); if (!titles[r.topic]) return;   // only topics of the collection (not the _template page)
+        var o = per[r.topic] = per[r.topic] || { answered: 0, total: 0, points: 0, max: 0 };
+        o.answered += ui.store.count(p); o.total += r.total; o.points += ui.store.points(p); o.max += r.max;
+        all.answered += ui.store.count(p); all.total += r.total; all.points += ui.store.points(p); all.max += r.max;
+      });
+      var slugs = Object.keys(per);
+      if (!slugs.length) { el.innerHTML = '<span class="figs">Nothing yet. Open a topic to start.</span>'; return; }
+      el.innerHTML = slugs.map(function (s) { return '<span class="figs">' + (titles[s] || s) + ': ' + ui.figs(per[s].answered, per[s].total, per[s].points, per[s].max) + '</span>'; }).join('<br>') +
+        '<br><span class="figs"><strong>All topics: ' + ui.figs(all.answered, all.total, all.points, all.max) + '</strong></span> <button type="button" class="btn-ghost small" id="reset-all"></button>';
+      ui.confirmClick(document.getElementById('reset-all'), 'Reset everything', 'Click again to erase every answer and point on this site', function () { ui.store.reset(); progress(); });
+    }
+    progress();
     document.getElementById('copyright').textContent = '© ' + OD.site.year + ' ' + OD.site.author + '. All rights reserved. The source code is not public; it is available on request.';
   })();
 </script>

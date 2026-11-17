@@ -10,7 +10,7 @@ Nothing to install: the lessons run in any modern browser, on a computer or a ph
 
 **Foundation**
 
-- 1. Mechanics fundamentals — Vectors, forces, Newton’s laws, energy. *(planned)*
+- 1. [Mechanics fundamentals](https://rasmusmott.github.io/civil-engineering-learning-tools/topics/mechanics-fundamentals/index.html) — Vectors, forces, Newton’s laws, energy and momentum, told through a construction site. Units and dimensions run through every lesson. *(in progress)*
 - 2. Statics — Free-body diagrams, supports, equilibrium, trusses and frames. *(planned)*
 - 3. Strength of materials — Stress and strain, bending, shear, torsion, Mohr’s circle. *(planned)*
 - 4. Beam deflections and indeterminate structures — Superposition, force method, virtual work. *(planned)*
@@ -31,7 +31,7 @@ Nothing to install: the lessons run in any modern browser, on a computer or a ph
 - 13. Matrix stiffness method — From truss to frame, by hand and by matrix. *(planned)*
 - 14. Finite element method — Bar, beam and plane elements, convergence, pitfalls. *(planned)*
 - 15. Fluid mechanics and CFD basics — Pressure, flow, drag, and what a CFD solver does. *(planned)*
-- 16. [Structural dynamics](https://rasmusmott.github.io/civil-engineering-learning-tools/topics/structural-dynamics/index.html) — Vibration, resonance, modes, waves and fatigue, told through an offshore wind turbine. *(in progress)*
+- 16. [Structural dynamics](https://rasmusmott.github.io/civil-engineering-learning-tools/topics/structural-dynamics/index.html) — Vibration, resonance, time stepping and modes, told through an offshore wind turbine. Waves, spectra, fatigue and soil follow after the topics they build on.
 
 **Computational design**
 
