@@ -3,7 +3,7 @@
 <div class="col">
   <div class="eyebrow">Structural dynamics · Lesson 16.3</div>
   <h1>Time stepping with Newmark</h1>
-  <p class="lede">Lessons 16.1 and 16.2 had formulas for the answer. Real loads rarely allow that: a wave slams, a gust passes, a rotor stop takes a few seconds. The practical way through is to march forward in small time steps and solve a small static-looking problem at each one. Most programs that compute dynamic response in time work this way, and their results are only as good as the step size you give it.</p>
+  <p class="lede">Lessons 16.1 and 16.2 had formulas for the answer. Real loads rarely allow that. A wave slams, a gust passes, a rotor stop takes a few seconds. The practical way through is to march forward in small time steps and solve a small static-looking problem at each one. Most programs that compute dynamic response in time work this way, and their results are only as good as the step size you give them.</p>
   <div class="say">
     <strong>After this lesson you can explain</strong>
     <ul>

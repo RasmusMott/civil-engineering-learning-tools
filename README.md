@@ -11,7 +11,7 @@ Nothing to install: the lessons run in any modern browser, on a computer or a ph
 **Foundation**
 
 - 1. [Mechanics fundamentals](https://rasmusmott.github.io/civil-engineering-learning-tools/topics/mechanics-fundamentals/index.html) — Vectors, forces, Newton’s laws, energy and momentum, told through a construction site. Units and dimensions run through every lesson. *(in progress)*
-- 2. Statics — Free-body diagrams, supports, equilibrium, trusses and frames. *(planned)*
+- 2. [Statics](https://rasmusmott.github.io/civil-engineering-learning-tools/topics/statics/index.html) — Moments, supports, equilibrium, section forces, trusses and frames, told through a tower crane. *(in progress)*
 - 3. Strength of materials — Stress and strain, bending, shear, torsion, Mohr’s circle. *(planned)*
 - 4. Beam deflections and indeterminate structures — Superposition, force method, virtual work. *(planned)*
 - 5. Stability — Euler columns, buckling lengths, imperfections. *(planned)*
